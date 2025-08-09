@@ -23,6 +23,7 @@ type SongHandler struct {
 	logger       *log.Logger
 	errorHandler *ErrorHandler
 	downloader   downloader.SongDownloader
+	queue        *SongQueue
 }
 
 // NewSongHandler creates a new SongHandler instance
@@ -38,6 +39,9 @@ func NewSongHandler(client *TelegramBot, logger *log.Logger) *SongHandler {
 		handler.errorHandler = client.GetErrorHandler()
 	}
 
+	// Initialize queue
+	handler.queue = NewSongQueue(logger, handler)
+
 	return handler
 }
 
@@ -46,11 +50,14 @@ func (h *SongHandler) Command() string {
 	return "song"
 }
 
-// Handle processes the /song command and downloads a single song with progress tracking
-func (h *SongHandler) Handle(ctx context.Context, cmdCtx *CommandContext) error {
-	startTime := time.Now()
+// GetQueue returns the song queue for external access
+func (h *SongHandler) GetQueue() *SongQueue {
+	return h.queue
+}
 
-	h.logger.Printf("Processing /song command for user %d in chat %d", cmdCtx.UserID, cmdCtx.ChatID)
+// Handle processes the /song command and manages queueing
+func (h *SongHandler) Handle(ctx context.Context, cmdCtx *CommandContext) error {
+	h.logger.Printf("Received /song command for user %d in chat %d", cmdCtx.UserID, cmdCtx.ChatID)
 
 	// Check if URL is provided
 	if strings.TrimSpace(cmdCtx.Args) == "" {
@@ -58,6 +65,54 @@ func (h *SongHandler) Handle(ctx context.Context, cmdCtx *CommandContext) error 
 	}
 
 	// Parse and validate the URL
+	songURL := strings.TrimSpace(cmdCtx.Args)
+	urlMeta := ExtractURLMeta(songURL)
+	if urlMeta == nil {
+		return h.sendErrorMessage(ctx, cmdCtx.ChatID, "Please provide a valid Apple Music URL.")
+	}
+
+	// Add to queue
+	return h.addToQueue(ctx, cmdCtx, songURL)
+}
+
+// addToQueue adds a request to the song queue
+func (h *SongHandler) addToQueue(ctx context.Context, cmdCtx *CommandContext, songURL string) error {
+	// Try to add request to queue
+	request, err := h.queue.AddRequest(cmdCtx.UserID, cmdCtx.ChatID, cmdCtx.MessageID, songURL)
+	if err != nil {
+		// Check if queue is full
+		if strings.Contains(err.Error(), "queue is full") {
+			return h.sendErrorMessage(ctx, cmdCtx.ChatID, fmt.Sprintf("❌ Queue is full! Current limit is %d requests. Please wait some time before adding new requests.", MaxQueueSize))
+		}
+		return h.sendErrorMessage(ctx, cmdCtx.ChatID, fmt.Sprintf("❌ Failed to add request to queue: %v", err))
+	}
+
+	// Get queue position
+	queueSize := h.queue.GetQueueSize()
+	isCurrentlyProcessing := h.queue.IsProcessing()
+
+	var message string
+	if queueSize == 0 && !isCurrentlyProcessing {
+		message = "🎵 Processing your request..."
+	} else {
+		position := h.queue.GetQueuePosition(request.UniqueID)
+		if position > 0 {
+			message = fmt.Sprintf("🎵 Your request is in queue at position %d", position)
+		} else {
+			message = "🎵 Your request has been queued for processing"
+		}
+	}
+
+	return h.sendMessage(ctx, cmdCtx.ChatID, message)
+}
+
+// ProcessDownload processes the actual song download (called by queue)
+func (h *SongHandler) ProcessDownload(ctx context.Context, cmdCtx *CommandContext) error {
+	startTime := time.Now()
+
+	h.logger.Printf("Processing song download for user %d in chat %d", cmdCtx.UserID, cmdCtx.ChatID)
+
+	// Parse and validate the URL again (for safety)
 	songURL := strings.TrimSpace(cmdCtx.Args)
 	urlMeta := ExtractURLMeta(songURL)
 	if urlMeta == nil {
@@ -128,7 +183,7 @@ func (h *SongHandler) Handle(ctx context.Context, cmdCtx *CommandContext) error 
 
 	// Log successful processing with timing
 	processingTime := time.Since(startTime)
-	h.logger.Printf("Successfully processed /song command for user %d (took %v)",
+	h.logger.Printf("Successfully processed song download for user %d (took %v)",
 		cmdCtx.UserID, processingTime)
 
 	return nil

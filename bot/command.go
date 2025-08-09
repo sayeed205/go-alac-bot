@@ -23,6 +23,8 @@ type CommandContext struct {
 	UserID int64
 	// ChatID is the ID of the chat where the command was sent
 	ChatID int64
+	// MessageID is the ID of the message containing the command
+	MessageID int
 	// Username is the username of the user (may be empty)
 	Username string
 	// FirstName is the first name of the user

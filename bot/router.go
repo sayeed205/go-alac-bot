@@ -58,16 +58,16 @@ func (r *CommandRouter) RouteCommand(ctx context.Context, update *tg.UpdateNewMe
 	}
 
 	// Execute the handler with panic recovery
-	r.logger.Printf("Routing command /%s to handler (user: %d, chat: %d)", 
+	r.logger.Printf("Routing command /%s to handler (user: %d, chat: %d)",
 		cmdCtx.Command, cmdCtx.UserID, cmdCtx.ChatID)
-	
+
 	// Add panic recovery for command handlers
 	defer func() {
 		if r.errorHandler != nil {
 			r.errorHandler.RecoverFromPanic()
 		}
 	}()
-	
+
 	if err := handler.Handle(ctx, cmdCtx); err != nil {
 		// Use error handler if available, otherwise return the error
 		if r.errorHandler != nil {
@@ -140,6 +140,7 @@ func (r *CommandRouter) extractCommandContext(update *tg.UpdateNewMessage) (*Com
 		Update:           update,
 		UserID:           userID,
 		ChatID:           chatID,
+		MessageID:        message.ID,
 		Username:         username,
 		FirstName:        firstName,
 		LastName:         lastName,

@@ -22,12 +22,12 @@ func NewHelpHandler(client *TelegramBot, logger *log.Logger) *HelpHandler {
 		client: client,
 		logger: logger,
 	}
-	
+
 	// Set error handler if client is available
 	if client != nil {
 		handler.errorHandler = client.GetErrorHandler()
 	}
-	
+
 	return handler
 }
 
@@ -39,33 +39,33 @@ func (h *HelpHandler) Command() string {
 // Handle processes the /help command and sends a help message with markdown formatting
 func (h *HelpHandler) Handle(ctx context.Context, cmdCtx *CommandContext) error {
 	startTime := time.Now()
-	
+
 	h.logger.Printf("Processing /help command for user %d in chat %d", cmdCtx.UserID, cmdCtx.ChatID)
-	
+
 	// Create context with timeout to meet 5-second requirement
 	timeoutCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	
+
 	// Create help message with markdown formatting
 	helpMessage := h.createHelpMessage()
-	
+
 	// Send the help message with markdown formatting
 	if err := h.sendMarkdownMessage(timeoutCtx, cmdCtx.ChatID, helpMessage); err != nil {
 		h.logger.Printf("Failed to send help message to chat %d: %v", cmdCtx.ChatID, err)
-		
+
 		// Use error handler if available for network errors
 		if h.errorHandler != nil && h.errorHandler.IsNetworkError(err) {
 			return h.errorHandler.HandleNetworkError(err, true)
 		}
-		
+
 		return fmt.Errorf("failed to send help message: %w", err)
 	}
-	
+
 	// Log successful processing with timing
 	processingTime := time.Since(startTime)
-	h.logger.Printf("Successfully processed /help command for user %d (took %v)", 
+	h.logger.Printf("Successfully processed /help command for user %d (took %v)",
 		cmdCtx.UserID, processingTime)
-	
+
 	return nil
 }
 
@@ -75,9 +75,16 @@ func (h *HelpHandler) createHelpMessage() string {
 
 /help - Show this help message
 /id - Get chat or user ID (reply to message for user ID)
-/song - Download a single song
+/song - Download a single song (queued processing)
+/queue - Check current song queue status
 /album - Get album URLs (WIP)
 /playlist - Get playlist URLs (WIP)
+
+*Queue System*
+
+🎵 Songs are processed one at a time in order
+📊 Maximum 7 requests can be queued
+⏱️ Use /queue to check your position
 
 *Examples*
 
@@ -85,6 +92,9 @@ func (h *HelpHandler) createHelpMessage() string {
 ` + "`/song https://music.apple.com/in/song/never-gonna-give-you-up/1559523359`" + `
 
 ` + "`/song https://music.apple.com/in/album/never-gonna-give-you-up/1559523357?i=1559523359`" + `
+
+*Queue status:*
+` + "`/queue`" + `
 
 *Album example:*
 ` + "`/album https://music.apple.com/in/album/3-originals/1559523357`" + `
@@ -100,11 +110,11 @@ func (h *HelpHandler) sendMarkdownMessage(ctx context.Context, chatID int64, mes
 	if h.client == nil || h.client.GetClient() == nil {
 		return fmt.Errorf("bot client is not initialized")
 	}
-	
+
 	// For bot API, we need to determine the correct peer type
 	// In most cases for bots, we're dealing with private chats (users)
 	var peer tg.InputPeerClass
-	
+
 	// If chatID is positive, it's likely a user chat
 	if chatID > 0 {
 		peer = &tg.InputPeerUser{UserID: chatID}
@@ -113,10 +123,10 @@ func (h *HelpHandler) sendMarkdownMessage(ctx context.Context, chatID int64, mes
 		// For now, we'll treat it as a chat (group)
 		peer = &tg.InputPeerChat{ChatID: -chatID}
 	}
-	
+
 	// Create message entities for markdown formatting
 	entities := h.parseMarkdownEntities(message)
-	
+
 	// Create the message request with markdown entities
 	request := &tg.MessagesSendMessageRequest{
 		Peer:     peer,
@@ -124,13 +134,13 @@ func (h *HelpHandler) sendMarkdownMessage(ctx context.Context, chatID int64, mes
 		RandomID: time.Now().UnixNano(),
 		Entities: entities,
 	}
-	
+
 	// Send the message using gotgproto client
 	_, err := h.client.GetClient().API().MessagesSendMessage(ctx, request)
 	if err != nil {
 		return fmt.Errorf("failed to send markdown message via Telegram API: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -139,11 +149,11 @@ func (h *HelpHandler) parseMarkdownEntities(text string) []tg.MessageEntityClass
 	var entities []tg.MessageEntityClass
 	offset := 0
 	cleanText := ""
-	
+
 	i := 0
 	for i < len(text) {
 		char := text[i]
-		
+
 		switch char {
 		case '*':
 			// Find closing asterisk for bold
@@ -172,13 +182,13 @@ func (h *HelpHandler) parseMarkdownEntities(text string) []tg.MessageEntityClass
 				continue
 			}
 		}
-		
+
 		// Add regular character
 		cleanText += string(char)
 		offset++
 		i++
 	}
-	
+
 	return entities
 }
 
@@ -196,10 +206,10 @@ func (h *HelpHandler) findClosing(text string, start int, char byte) int {
 func (h *HelpHandler) stripMarkdownSyntax(text string) string {
 	result := ""
 	i := 0
-	
+
 	for i < len(text) {
 		char := text[i]
-		
+
 		switch char {
 		case '*':
 			// Skip bold markers
@@ -216,11 +226,11 @@ func (h *HelpHandler) stripMarkdownSyntax(text string) string {
 				continue
 			}
 		}
-		
+
 		// Add regular character
 		result += string(char)
 		i++
 	}
-	
+
 	return result
 }
