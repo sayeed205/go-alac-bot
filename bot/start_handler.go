@@ -11,16 +11,24 @@ import (
 
 // StartHandler implements CommandHandler for the /start command
 type StartHandler struct {
-	client *TelegramBot
-	logger *log.Logger
+	client       *TelegramBot
+	logger       *log.Logger
+	errorHandler *ErrorHandler
 }
 
 // NewStartHandler creates a new StartHandler instance
 func NewStartHandler(client *TelegramBot, logger *log.Logger) *StartHandler {
-	return &StartHandler{
+	handler := &StartHandler{
 		client: client,
 		logger: logger,
 	}
+	
+	// Set error handler if client is available
+	if client != nil {
+		handler.errorHandler = client.GetErrorHandler()
+	}
+	
+	return handler
 }
 
 // Command returns the command string this handler processes
@@ -44,9 +52,15 @@ func (h *StartHandler) Handle(ctx context.Context, cmdCtx *CommandContext) error
 	// Create welcome message
 	welcomeMessage := h.createWelcomeMessage(userName)
 	
-	// Send the welcome message
+	// Send the welcome message with error handling
 	if err := h.sendMessage(timeoutCtx, cmdCtx.ChatID, welcomeMessage); err != nil {
 		h.logger.Printf("Failed to send welcome message to chat %d: %v", cmdCtx.ChatID, err)
+		
+		// Use error handler if available for network errors
+		if h.errorHandler != nil && h.errorHandler.IsNetworkError(err) {
+			return h.errorHandler.HandleNetworkError(err, true)
+		}
+		
 		return fmt.Errorf("failed to send welcome message: %w", err)
 	}
 	

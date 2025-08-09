@@ -11,16 +11,24 @@ import (
 
 // PingHandler implements CommandHandler for the /ping command
 type PingHandler struct {
-	client *TelegramBot
-	logger *log.Logger
+	client       *TelegramBot
+	logger       *log.Logger
+	errorHandler *ErrorHandler
 }
 
 // NewPingHandler creates a new PingHandler instance
 func NewPingHandler(client *TelegramBot, logger *log.Logger) *PingHandler {
-	return &PingHandler{
+	handler := &PingHandler{
 		client: client,
 		logger: logger,
 	}
+	
+	// Set error handler if client is available
+	if client != nil {
+		handler.errorHandler = client.GetErrorHandler()
+	}
+	
+	return handler
 }
 
 // Command returns the command string this handler processes
@@ -44,9 +52,15 @@ func (h *PingHandler) Handle(ctx context.Context, cmdCtx *CommandContext) error 
 	// Create pong message with timestamp and latency information
 	pongMessage := h.createPongMessage(startTime, commandLatency)
 	
-	// Send the pong response immediately
+	// Send the pong response immediately with error handling
 	if err := h.sendMessage(timeoutCtx, cmdCtx.ChatID, pongMessage); err != nil {
 		h.logger.Printf("Failed to send pong message to chat %d: %v", cmdCtx.ChatID, err)
+		
+		// Use error handler if available for network errors
+		if h.errorHandler != nil && h.errorHandler.IsNetworkError(err) {
+			return h.errorHandler.HandleNetworkError(err, true)
+		}
+		
 		return fmt.Errorf("failed to send pong message: %w", err)
 	}
 	

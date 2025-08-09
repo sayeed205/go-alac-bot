@@ -12,8 +12,9 @@ import (
 
 // CommandRouter handles routing of commands to their respective handlers
 type CommandRouter struct {
-	handlers map[string]CommandHandler
-	logger   *log.Logger
+	handlers     map[string]CommandHandler
+	logger       *log.Logger
+	errorHandler *ErrorHandler
 }
 
 // NewCommandRouter creates a new command router instance
@@ -22,6 +23,11 @@ func NewCommandRouter(logger *log.Logger) *CommandRouter {
 		handlers: make(map[string]CommandHandler),
 		logger:   logger,
 	}
+}
+
+// SetErrorHandler sets the error handler for the router
+func (r *CommandRouter) SetErrorHandler(errorHandler *ErrorHandler) {
+	r.errorHandler = errorHandler
 }
 
 // RegisterHandler registers a command handler for a specific command
@@ -51,11 +57,23 @@ func (r *CommandRouter) RouteCommand(ctx context.Context, update *tg.UpdateNewMe
 		return nil // Not an error, just no handler available
 	}
 
-	// Execute the handler
+	// Execute the handler with panic recovery
 	r.logger.Printf("Routing command /%s to handler (user: %d, chat: %d)", 
 		cmdCtx.Command, cmdCtx.UserID, cmdCtx.ChatID)
 	
+	// Add panic recovery for command handlers
+	defer func() {
+		if r.errorHandler != nil {
+			r.errorHandler.RecoverFromPanic()
+		}
+	}()
+	
 	if err := handler.Handle(ctx, cmdCtx); err != nil {
+		// Use error handler if available, otherwise return the error
+		if r.errorHandler != nil {
+			r.errorHandler.HandleCommandError(err, cmdCtx)
+			return nil // Error has been handled, don't propagate
+		}
 		return fmt.Errorf("handler failed for command /%s: %w", cmdCtx.Command, err)
 	}
 

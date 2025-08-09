@@ -15,12 +15,13 @@ import (
 
 // TelegramBot wraps the gotgproto client and provides bot lifecycle management
 type TelegramBot struct {
-	client *gotgproto.Client
-	logger *log.Logger
-	config *config.BotConfig
-	router *CommandRouter
-	ctx    context.Context
-	cancel context.CancelFunc
+	client       *gotgproto.Client
+	logger       *log.Logger
+	config       *config.BotConfig
+	router       *CommandRouter
+	errorHandler *ErrorHandler
+	ctx          context.Context
+	cancel       context.CancelFunc
 }
 
 // NewTelegramBot creates a new TelegramBot instance with proper gotgproto client setup
@@ -44,6 +45,12 @@ func NewTelegramBot(cfg *config.BotConfig, logger *log.Logger) (*TelegramBot, er
 		cancel: cancel,
 	}
 	
+	// Initialize error handler
+	bot.errorHandler = NewErrorHandler(logger, bot)
+	
+	// Set error handler in router
+	bot.router.SetErrorHandler(bot.errorHandler)
+	
 	return bot, nil
 }
 
@@ -51,9 +58,19 @@ func NewTelegramBot(cfg *config.BotConfig, logger *log.Logger) (*TelegramBot, er
 func (b *TelegramBot) Start() error {
 	b.logger.Printf("Starting Telegram bot...")
 	
+	// Add panic recovery for the entire start process
+	defer func() {
+		if b.errorHandler != nil {
+			b.errorHandler.RecoverFromPanic()
+		}
+	}()
+	
 	// Create zap logger for gotgproto (it requires zap logger)
 	zapLogger, err := zap.NewDevelopment()
 	if err != nil {
+		if b.errorHandler != nil && b.errorHandler.IsNetworkError(err) {
+			return b.errorHandler.HandleNetworkError(err, true)
+		}
 		return fmt.Errorf("failed to create zap logger: %w", err)
 	}
 	
@@ -63,9 +80,18 @@ func (b *TelegramBot) Start() error {
 		Logger:  zapLogger,
 	}
 	
-	// Initialize gotgproto client
-	client, err := gotgproto.NewClient(b.config.APIID, b.config.APIHash, gotgproto.ClientTypeBot(b.config.Token), clientOpts)
+	// Initialize gotgproto client with retry logic for network errors
+	var client *gotgproto.Client
+	err = b.errorHandler.retryWithBackoff(func() error {
+		var clientErr error
+		client, clientErr = gotgproto.NewClient(b.config.APIID, b.config.APIHash, gotgproto.ClientTypeBot(b.config.Token), clientOpts)
+		return clientErr
+	}, 3, time.Second)
+	
 	if err != nil {
+		if b.errorHandler != nil {
+			b.errorHandler.HandleRuntimeError(fmt.Errorf("failed to create gotgproto client after retries: %w", err))
+		}
 		return fmt.Errorf("failed to create gotgproto client: %w", err)
 	}
 	
@@ -74,6 +100,12 @@ func (b *TelegramBot) Start() error {
 	
 	// Start the client - this is a blocking call, so we run it in a goroutine
 	go func() {
+		defer func() {
+			if b.errorHandler != nil {
+				b.errorHandler.RecoverFromPanic()
+			}
+		}()
+		
 		b.logger.Printf("Starting gotgproto client...")
 		b.client.Idle()
 	}()
@@ -121,4 +153,9 @@ func (b *TelegramBot) RegisterCommandHandler(handler CommandHandler) {
 // GetRouter returns the command router for advanced usage
 func (b *TelegramBot) GetRouter() *CommandRouter {
 	return b.router
+}
+
+// GetErrorHandler returns the error handler for advanced usage
+func (b *TelegramBot) GetErrorHandler() *ErrorHandler {
+	return b.errorHandler
 }
