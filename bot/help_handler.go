@@ -74,6 +74,7 @@ func (h *HelpHandler) createHelpMessage() string {
 	return `*Available Commands*
 
 /help - Show this help message
+/id - Get chat or user ID (reply to message for user ID)
 /song - Download a single song
 /album - Get album URLs (WIP)
 /playlist - Get playlist URLs (WIP)

@@ -122,6 +122,10 @@ func registerCommandHandlers(telegramBot *bot.TelegramBot, logger *log.Logger) {
 	helpHandler := bot.NewHelpHandler(telegramBot, logger)
 	telegramBot.RegisterCommandHandler(helpHandler)
 	
+	// Create and register /id command handler
+	idHandler := bot.NewIDHandler(telegramBot, logger)
+	telegramBot.RegisterCommandHandler(idHandler)
+	
 	// Log registered commands
 	registeredCommands := telegramBot.GetRouter().GetRegisteredCommands()
 	logger.Printf("Registered %d command handlers: %v", len(registeredCommands), registeredCommands)

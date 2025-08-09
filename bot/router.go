@@ -128,16 +128,25 @@ func (r *CommandRouter) extractCommandContext(update *tg.UpdateNewMessage) (*Com
 		chatID = peer.ChannelID
 	}
 
+	// Extract reply message ID if this is a reply
+	var replyToMessageID int32
+	if message.ReplyTo != nil {
+		if replyHeader, ok := message.ReplyTo.(*tg.MessageReplyHeader); ok {
+			replyToMessageID = int32(replyHeader.ReplyToMsgID)
+		}
+	}
+
 	return &CommandContext{
-		Update:    update,
-		UserID:    userID,
-		ChatID:    chatID,
-		Username:  username,
-		FirstName: firstName,
-		LastName:  lastName,
-		Command:   command,
-		Args:      args,
-		Timestamp: time.Now(),
+		Update:           update,
+		UserID:           userID,
+		ChatID:           chatID,
+		Username:         username,
+		FirstName:        firstName,
+		LastName:         lastName,
+		Command:          command,
+		Args:             args,
+		ReplyToMessageID: replyToMessageID,
+		Timestamp:        time.Now(),
 	}, nil
 }
 

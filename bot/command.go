@@ -33,6 +33,8 @@ type CommandContext struct {
 	Command string
 	// Args contains command arguments (text after the command)
 	Args string
+	// ReplyToMessageID is the ID of the message being replied to (0 if not a reply)
+	ReplyToMessageID int32
 	// Timestamp is when the command was received
 	Timestamp time.Time
 }
