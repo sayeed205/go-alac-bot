@@ -4,11 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/celestix/gotgproto"
+	"github.com/celestix/gotgproto/dispatcher/handlers"
+	"github.com/celestix/gotgproto/dispatcher/handlers/filters"
+	"github.com/celestix/gotgproto/ext"
 	"github.com/celestix/gotgproto/sessionMaker"
+	"github.com/celestix/gotgproto/types"
 	"github.com/glebarez/sqlite"
+	"github.com/gotd/td/tg"
 	"go-alac-bot/config"
 	"go.uber.org/zap"
 )
@@ -98,6 +104,9 @@ func (b *TelegramBot) Start() error {
 	b.client = client
 	b.logger.Printf("Telegram bot client initialized successfully")
 	
+	// Set up update handler to route commands
+	b.setupUpdateHandler()
+	
 	// Start the client - this is a blocking call, so we run it in a goroutine
 	go func() {
 		defer func() {
@@ -158,4 +167,58 @@ func (b *TelegramBot) GetRouter() *CommandRouter {
 // GetErrorHandler returns the error handler for advanced usage
 func (b *TelegramBot) GetErrorHandler() *ErrorHandler {
 	return b.errorHandler
+}
+
+// setupUpdateHandler configures the update handler to route incoming messages to command handlers
+func (b *TelegramBot) setupUpdateHandler() {
+	b.logger.Printf("Setting up update handler for command routing...")
+	
+	// Set up message handler for all text messages (including commands)
+	b.client.Dispatcher.AddHandler(handlers.NewMessage(filters.Message.Text, b.handleMessage))
+	
+	b.logger.Printf("Update handler configured successfully")
+}
+
+// handleMessage processes incoming text messages and routes commands to handlers
+func (b *TelegramBot) handleMessage(ctx *ext.Context, update *ext.Update) error {
+	// Add panic recovery for update handling
+	defer func() {
+		if b.errorHandler != nil {
+			b.errorHandler.RecoverFromPanic()
+		}
+	}()
+	
+	// Get the effective message
+	msg := update.EffectiveMessage
+	if msg == nil {
+		return nil
+	}
+	
+	// Check if this is a command (starts with /)
+	if !strings.HasPrefix(msg.Text, "/") {
+		return nil // Not a command, ignore
+	}
+	
+	// Extract basic information for command routing
+	// We'll create a simplified command context directly instead of converting to tg types
+	b.routeCommandDirect(ctx.Context, msg)
+	
+	return nil
+}
+
+// routeCommandDirect routes commands directly without converting to tg types
+func (b *TelegramBot) routeCommandDirect(ctx context.Context, msg *types.Message) {
+	// Since types.Message embeds *tg.Message, we can use it directly
+	// Just need to create the UpdateNewMessage wrapper
+	updateNewMessage := &tg.UpdateNewMessage{
+		Message:  msg.Message, // Use the embedded tg.Message
+		Pts:      0,
+		PtsCount: 0,
+	}
+	
+	// Use the existing router which handles all the logic
+	if err := b.router.RouteCommand(ctx, updateNewMessage); err != nil {
+		b.logger.Printf("Error routing command: %v", err)
+		// Error is already handled by the router's error handler
+	}
 }

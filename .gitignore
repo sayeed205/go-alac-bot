@@ -35,3 +35,6 @@ go.work
 # Builds
 go-alac-bot
 go-alac-bot.exe
+
+# Bot Sessions
+*.db
