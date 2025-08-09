@@ -18,6 +18,7 @@ type TelegramBot struct {
 	client *gotgproto.Client
 	logger *log.Logger
 	config *config.BotConfig
+	router *CommandRouter
 	ctx    context.Context
 	cancel context.CancelFunc
 }
@@ -38,6 +39,7 @@ func NewTelegramBot(cfg *config.BotConfig, logger *log.Logger) (*TelegramBot, er
 	bot := &TelegramBot{
 		config: cfg,
 		logger: logger,
+		router: NewCommandRouter(logger),
 		ctx:    ctx,
 		cancel: cancel,
 	}
@@ -109,4 +111,14 @@ func (b *TelegramBot) GetClient() *gotgproto.Client {
 // IsRunning returns true if the bot is currently running
 func (b *TelegramBot) IsRunning() bool {
 	return b.client != nil && b.ctx.Err() == nil
+}
+
+// RegisterCommandHandler registers a command handler with the bot's router
+func (b *TelegramBot) RegisterCommandHandler(handler CommandHandler) {
+	b.router.RegisterHandler(handler)
+}
+
+// GetRouter returns the command router for advanced usage
+func (b *TelegramBot) GetRouter() *CommandRouter {
+	return b.router
 }
