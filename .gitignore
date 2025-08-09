@@ -38,3 +38,17 @@ go-alac-bot.exe
 
 # Bot Sessions
 *.db
+
+# Downloads directory
+downloads/
+*.m4a
+*.mp3
+*.mp4
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+temp/
+tmp/

@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  go-alac-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: go-alac-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./downloads:/app/downloads
+      - ./bot_session.db:/app/bot_session.db
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    networks:
+      - bot-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Optional health check
+    healthcheck:
+      test: ["CMD", "pgrep", "go-alac-bot"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  bot-network:
+    driver: bridge
+
+volumes:
+  downloads:
+    driver: local
