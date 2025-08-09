@@ -31,3 +31,7 @@ go.work
 
 # IntelliJ IDEA
 .idea/
+
+# Builds
+go-alac-bot
+go-alac-bot.exe
