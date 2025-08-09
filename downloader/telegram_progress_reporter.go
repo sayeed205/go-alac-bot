@@ -38,25 +38,30 @@ func NewTelegramProgressReporter(api TelegramAPI) *TelegramProgressReporter {
 func (tpr *TelegramProgressReporter) StartTracking(ctx context.Context, chatID int64, songName string) error {
 	tpr.mu.Lock()
 	defer tpr.mu.Unlock()
-	
+
 	if tpr.isActive {
 		return NewDownloadError(ErrorUnknown, "progress tracking is already active")
 	}
-	
+
 	tpr.chatID = chatID
 	tpr.songName = songName
 	tpr.isActive = true
 	tpr.startTime = time.Now()
 	tpr.messageID = 0 // Will be set when first message is sent
-	
-	// Send initial message
-	initialMessage := fmt.Sprintf("🎵 **%s**\n\n⏳ Initializing download...", songName)
+
+	// Send initial message - check if it's an upload (has 📤 emoji)
+	var initialMessage string
+	if strings.Contains(songName, "📤") {
+		initialMessage = fmt.Sprintf("🎵 **%s**\n\n⏳ Initializing upload...", songName)
+	} else {
+		initialMessage = fmt.Sprintf("🎵 **%s**\n\n⏳ Initializing download...", songName)
+	}
 	messageID, err := tpr.sendMessage(ctx, initialMessage)
 	if err != nil {
 		tpr.isActive = false
 		return NewDownloadErrorWithCause(ErrorNetworkFailure, "failed to send initial progress message", err)
 	}
-	
+
 	tpr.messageID = messageID
 	return nil
 }
@@ -68,20 +73,20 @@ func (tpr *TelegramProgressReporter) UpdateProgress(phase Phase, progress Progre
 		tpr.mu.RUnlock()
 		return nil // Not active or no message to update
 	}
-	
+
 	chatID := tpr.chatID
 	messageID := tpr.messageID
 	songName := tpr.songName
 	startTime := tpr.startTime
 	tpr.mu.RUnlock()
-	
+
 	// Format progress message
 	message := tpr.formatProgressMessage(songName, phase, progress, startTime)
-	
+
 	// Update the message
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	return tpr.editMessage(ctx, chatID, messageID, message)
 }
 
@@ -92,24 +97,24 @@ func (tpr *TelegramProgressReporter) ReportPhaseChange(oldPhase, newPhase Phase)
 		tpr.mu.RUnlock()
 		return nil
 	}
-	
+
 	chatID := tpr.chatID
 	messageID := tpr.messageID
 	songName := tpr.songName
 	startTime := tpr.startTime
 	tpr.mu.RUnlock()
-	
+
 	// Create phase transition message
 	message := fmt.Sprintf("🎵 **%s**\n\n%s %s\n\n⏱️ Elapsed: %s",
 		songName,
 		tpr.getPhaseEmoji(newPhase),
 		tpr.getPhaseDescription(newPhase),
 		time.Since(startTime).Round(time.Second))
-	
+
 	// Update the message
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	return tpr.editMessage(ctx, chatID, messageID, message)
 }
 
@@ -120,13 +125,13 @@ func (tpr *TelegramProgressReporter) ReportError(err error) error {
 		tpr.mu.RUnlock()
 		return nil
 	}
-	
+
 	chatID := tpr.chatID
 	messageID := tpr.messageID
 	songName := tpr.songName
 	startTime := tpr.startTime
 	tpr.mu.RUnlock()
-	
+
 	// Format error message
 	errorMsg := "An error occurred"
 	if downloadErr, ok := err.(*DownloadError); ok {
@@ -134,16 +139,16 @@ func (tpr *TelegramProgressReporter) ReportError(err error) error {
 	} else if err != nil {
 		errorMsg = err.Error()
 	}
-	
+
 	message := fmt.Sprintf("🎵 **%s**\n\n❌ **Error**: %s\n\n⏱️ Elapsed: %s",
 		songName,
 		errorMsg,
 		time.Since(startTime).Round(time.Second))
-	
+
 	// Update the message
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	return tpr.editMessage(ctx, chatID, messageID, message)
 }
 
@@ -154,21 +159,28 @@ func (tpr *TelegramProgressReporter) ReportComplete(duration time.Duration, file
 		tpr.mu.RUnlock()
 		return nil
 	}
-	
+
 	chatID := tpr.chatID
 	messageID := tpr.messageID
 	songName := tpr.songName
 	tpr.mu.RUnlock()
-	
-	// Format completion message
-	message := fmt.Sprintf("🎵 **%s**\n\n✅ **Download Complete!**\n\n⏱️ Total time: %s\n📁 Ready for upload...",
-		songName,
-		duration.Round(time.Second))
-	
+
+	// Format completion message - check if it's an upload
+	var message string
+	if strings.Contains(songName, "📤") {
+		message = fmt.Sprintf("🎵 **%s**\n\n✅ **Upload Complete!**\n\n⏱️ Total time: %s",
+			songName,
+			duration.Round(time.Second))
+	} else {
+		message = fmt.Sprintf("🎵 **%s**\n\n✅ **Download Complete!**\n\n⏱️ Total time: %s\n📁 Ready for upload...",
+			songName,
+			duration.Round(time.Second))
+	}
+
 	// Update the message
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	return tpr.editMessage(ctx, chatID, messageID, message)
 }
 
@@ -176,7 +188,7 @@ func (tpr *TelegramProgressReporter) ReportComplete(duration time.Duration, file
 func (tpr *TelegramProgressReporter) Stop() {
 	tpr.mu.Lock()
 	defer tpr.mu.Unlock()
-	
+
 	tpr.isActive = false
 	tpr.messageID = 0
 	tpr.chatID = 0
@@ -188,7 +200,7 @@ func (tpr *TelegramProgressReporter) sendMessage(ctx context.Context, message st
 	if tpr.api == nil {
 		return 0, NewDownloadError(ErrorUnknown, "telegram API is not initialized")
 	}
-	
+
 	// Determine peer type based on chat ID
 	var peer tg.InputPeerClass
 	if tpr.chatID > 0 {
@@ -196,18 +208,18 @@ func (tpr *TelegramProgressReporter) sendMessage(ctx context.Context, message st
 	} else {
 		peer = &tg.InputPeerChat{ChatID: -tpr.chatID}
 	}
-	
+
 	request := &tg.MessagesSendMessageRequest{
 		Peer:     peer,
 		Message:  message,
 		RandomID: time.Now().UnixNano(),
 	}
-	
+
 	updates, err := tpr.api.MessagesSendMessage(ctx, request)
 	if err != nil {
 		return 0, err
 	}
-	
+
 	// Extract message ID from updates
 	messageID := tpr.extractMessageID(updates)
 	return messageID, nil
@@ -218,7 +230,7 @@ func (tpr *TelegramProgressReporter) editMessage(ctx context.Context, chatID int
 	if tpr.api == nil {
 		return NewDownloadError(ErrorUnknown, "telegram API is not initialized")
 	}
-	
+
 	// Determine peer type based on chat ID
 	var peer tg.InputPeerClass
 	if chatID > 0 {
@@ -226,13 +238,13 @@ func (tpr *TelegramProgressReporter) editMessage(ctx context.Context, chatID int
 	} else {
 		peer = &tg.InputPeerChat{ChatID: -chatID}
 	}
-	
+
 	request := &tg.MessagesEditMessageRequest{
 		Peer:    peer,
 		ID:      messageID,
 		Message: message,
 	}
-	
+
 	_, err := tpr.api.MessagesEditMessage(ctx, request)
 	return err
 }
@@ -257,23 +269,23 @@ func (tpr *TelegramProgressReporter) extractMessageID(updates tg.UpdatesClass) i
 // formatProgressMessage formats a progress update message
 func (tpr *TelegramProgressReporter) formatProgressMessage(songName string, phase Phase, progress Progress, startTime time.Time) string {
 	var builder strings.Builder
-	
+
 	// Song title
 	builder.WriteString(fmt.Sprintf("🎵 **%s**\n\n", songName))
-	
+
 	// Phase indicator
 	builder.WriteString(fmt.Sprintf("%s %s\n\n", tpr.getPhaseEmoji(phase), tpr.getPhaseDescription(phase)))
-	
+
 	// Progress bar and percentage
 	if progress.TotalBytes > 0 {
 		progressBar := tpr.createProgressBar(progress.Percentage, 20)
 		builder.WriteString(fmt.Sprintf("📊 %s %.1f%%\n", progressBar, progress.Percentage))
-		
+
 		// File size info
-		builder.WriteString(fmt.Sprintf("📦 %s / %s\n", 
-			tpr.formatBytes(progress.BytesProcessed), 
+		builder.WriteString(fmt.Sprintf("📦 %s / %s\n",
+			tpr.formatBytes(progress.BytesProcessed),
 			tpr.formatBytes(progress.TotalBytes)))
-		
+
 		// Speed and ETA
 		if progress.Speed > 0 {
 			builder.WriteString(fmt.Sprintf("⚡ %s/s", tpr.formatBytes(progress.Speed)))
@@ -283,10 +295,10 @@ func (tpr *TelegramProgressReporter) formatProgressMessage(songName string, phas
 			builder.WriteString("\n")
 		}
 	}
-	
+
 	// Elapsed time
 	builder.WriteString(fmt.Sprintf("\n⏱️ Elapsed: %s", time.Since(startTime).Round(time.Second)))
-	
+
 	return builder.String()
 }
 
@@ -298,10 +310,10 @@ func (tpr *TelegramProgressReporter) createProgressBar(percentage float64, lengt
 	if percentage > 100 {
 		percentage = 100
 	}
-	
+
 	filled := int((percentage / 100.0) * float64(length))
 	empty := length - filled
-	
+
 	return strings.Repeat("█", filled) + strings.Repeat("░", empty)
 }
 
@@ -311,13 +323,13 @@ func (tpr *TelegramProgressReporter) formatBytes(bytes int64) string {
 	if bytes < unit {
 		return fmt.Sprintf("%d B", bytes)
 	}
-	
+
 	div, exp := int64(unit), 0
 	for n := bytes / unit; n >= unit; n /= unit {
 		div *= unit
 		exp++
 	}
-	
+
 	units := []string{"KB", "MB", "GB", "TB"}
 	return fmt.Sprintf("%.1f %s", float64(bytes)/float64(div), units[exp])
 }
@@ -333,6 +345,8 @@ func (tpr *TelegramProgressReporter) getPhaseEmoji(phase Phase) string {
 		return "🔓"
 	case PhaseWriting:
 		return "💾"
+	case PhaseUploading:
+		return "📤"
 	case PhaseComplete:
 		return "✅"
 	case PhaseError:
@@ -353,8 +367,10 @@ func (tpr *TelegramProgressReporter) getPhaseDescription(phase Phase) string {
 		return "Decrypting audio..."
 	case PhaseWriting:
 		return "Writing file..."
+	case PhaseUploading:
+		return "Uploading to Telegram..."
 	case PhaseComplete:
-		return "Download complete!"
+		return "Upload complete!"
 	case PhaseError:
 		return "Error occurred"
 	default:
