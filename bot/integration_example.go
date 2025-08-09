@@ -33,7 +33,12 @@ func ExampleBotIntegration() error {
 	bot.RegisterCommandHandler(pingHandler)
 	logger.Printf("PingHandler registered successfully for command: /%s", pingHandler.Command())
 
-	// At this point, the bot would be ready to handle /start and /ping commands
+	// Create and register the HelpHandler
+	helpHandler := NewHelpHandler(bot, logger)
+	bot.RegisterCommandHandler(helpHandler)
+	logger.Printf("HelpHandler registered successfully for command: /%s", helpHandler.Command())
+
+	// At this point, the bot would be ready to handle /start, /ping, and /help commands
 	// In a real application, you would call bot.Start() here
 
 	return nil
@@ -92,6 +97,35 @@ func ExamplePingHandlerIntegration() error {
 	logger.Printf("PingHandler registered successfully for command: /%s", pingHandler.Command())
 
 	// At this point, the bot would be ready to handle /ping commands
+	// In a real application, you would call bot.Start() here
+
+	return nil
+}
+
+// ExampleHelpHandlerIntegration demonstrates how to integrate the HelpHandler with the bot
+func ExampleHelpHandlerIntegration() error {
+	// Load configuration
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return err
+	}
+
+	// Create logger
+	logger := log.New(log.Writer(), "[BOT] ", log.LstdFlags)
+
+	// Create bot instance
+	bot, err := NewTelegramBot(cfg, logger)
+	if err != nil {
+		return err
+	}
+
+	// Create and register the HelpHandler
+	helpHandler := NewHelpHandler(bot, logger)
+	bot.RegisterCommandHandler(helpHandler)
+
+	logger.Printf("HelpHandler registered successfully for command: /%s", helpHandler.Command())
+
+	// At this point, the bot would be ready to handle /help commands
 	// In a real application, you would call bot.Start() here
 
 	return nil

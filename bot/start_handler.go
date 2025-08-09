@@ -91,12 +91,7 @@ func (h *StartHandler) extractUserName(cmdCtx *CommandContext) string {
 
 // createWelcomeMessage creates a personalized welcome message
 func (h *StartHandler) createWelcomeMessage(userName string) string {
-	return fmt.Sprintf("👋 Hello %s!\n\n"+
-		"Welcome to the bot! I'm here to help you.\n\n"+
-		"Available commands:\n"+
-		"• /start - Show this welcome message\n"+
-		"• /ping - Check if the bot is responsive\n\n"+
-		"Feel free to try any of these commands!", userName)
+	return "Welcome to apple bot. use /help to see how to use it.\n\nFor now this bot only works in permitted group."
 }
 
 // sendMessage sends a text message to the specified chat
