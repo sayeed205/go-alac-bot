@@ -105,15 +105,22 @@ docker run -d \
 | `/help` | Show help and examples | `/help` |
 | `/song` | Download a song (queued) | `/song https://music.apple.com/...` |
 | `/queue` | Check queue status | `/queue` |
+| `/album` | Download entire albums (WIP) | `/album https://music.apple.com/...` |
 | `/id` | Get chat/user ID | `/id` or reply to message |
 | `/ping` | Test bot responsiveness | `/ping` |
 
-### Song Download Examples
+### Download Examples
 
+**Single Song:**
 ```
 /song https://music.apple.com/us/song/never-gonna-give-you-up/1559523359
 
 /song https://music.apple.com/us/album/never-gonna-give-you-up/1559523357?i=1559523359
+```
+
+**Album (Coming Soon):**
+```
+/album https://music.apple.com/us/album/3-originals/1559523357
 ```
 
 ### Queue System
@@ -257,15 +264,96 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Support
 
-- 🐛 **Issues**: [GitHub Issues](https://github.com/yourusername/go-alac-bot/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/yourusername/go-alac-bot/discussions)
-- 📧 **Email**: your-email@example.com
+- 🐛 **Issues**: [GitHub Issues](https://github.com/sayeed205/go-alac-bot/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/sayeed205/go-alac-bot/discussions)
+- 📧 **Email**: sayeed205@proton.me
 
 ## Acknowledgments
 
 - [gotgproto](https://github.com/celestix/gotgproto) - Telegram MTProto client
 - [gotd](https://github.com/gotd/td) - Low-level Telegram client
 - Apple Music for the music metadata API
+
+---
+
+## TODO / Roadmap
+
+### 🎵 Audio Features
+- [ ] **Album Support** - Download entire albums from Apple Music URLs
+  - Parse album metadata and track listings
+  - Batch download with queue management
+  - Album artwork and metadata preservation
+  - Progress tracking for multi-track downloads
+
+### 💾 Database & Caching
+- [ ] **PostgreSQL Integration** - Replace in-memory storage with persistent database
+  - Store Telegram file IDs for instant re-sharing
+  - Cache song metadata to avoid re-fetching
+  - User preferences and download history
+  - Queue persistence across restarts
+  - Database migrations and schema management
+
+### 🔐 Authentication & Authorization
+- [ ] **User Authentication System**
+  - Whitelist specific users by Telegram ID
+  - Group-based permissions (admin/member roles)
+  - Configuration-based user management
+  - Rate limiting per user/group
+  - Usage statistics and quotas
+
+### 📁 File Management
+- [ ] **Direct File Upload Support** 
+  - Accept audio files sent directly to bot
+  - Extract metadata from uploaded files
+  - Convert between audio formats if needed
+  - File validation and security checks
+  - Integration with existing queue system
+
+### 🛠️ Technical Improvements
+- [ ] **Performance Optimizations**
+  - Connection pooling for database
+  - Concurrent download processing (multiple workers)
+  - Memory usage optimization for large files
+  - Download resumption for interrupted transfers
+  - Compression and optimization for uploads
+
+- [ ] **Monitoring & Analytics**
+  - Prometheus metrics integration
+  - Health check endpoints
+  - Download success/failure tracking
+  - User activity monitoring
+  - Performance dashboards
+
+### 🔧 Infrastructure
+- [ ] **Production Deployment**
+  - Kubernetes manifests
+  - CI/CD pipeline setup
+  - Environment-specific configurations
+  - Backup and recovery procedures
+  - Load balancing for high availability
+
+### 📱 User Experience
+- [ ] **Enhanced Commands**
+  - `/history` - Show download history
+  - `/favorites` - Mark and manage favorite songs
+  - `/stats` - Personal usage statistics
+  - `/cancel` - Cancel current download
+  - `/admin` - Administrative commands
+
+- [ ] **Interactive Features**
+  - Inline keyboards for song selection
+  - Search functionality within Apple Music
+  - Playlist creation and management
+  - Quality selection options
+  - Download scheduling
+
+### 🔒 Security Enhancements
+- [ ] **Security Hardening**
+  - Input sanitization improvements
+  - Rate limiting and DDoS protection
+  - Encrypted storage for sensitive data
+  - Audit logging for admin actions
+  - HTTPS/TLS certificate management
 
 ---
 

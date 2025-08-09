@@ -77,8 +77,7 @@ func (h *HelpHandler) createHelpMessage() string {
 /id - Get chat or user ID (reply to message for user ID)
 /song - Download a single song (queued processing)
 /queue - Check current song queue status
-/album - Get album URLs (WIP)
-/playlist - Get playlist URLs (WIP)
+/album - Download entire albums (WIP)
 
 *Queue System*
 
@@ -98,9 +97,6 @@ func (h *HelpHandler) createHelpMessage() string {
 
 *Album example:*
 ` + "`/album https://music.apple.com/in/album/3-originals/1559523357`" + `
-
-*Playlist example:*
-` + "`/playlist https://music.apple.com/library/playlist/p.vMO5kRQiX1xGMr`" + `
 
 *Tip:* Tap on any URL above to copy it!`
 }
