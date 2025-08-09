@@ -56,8 +56,12 @@ func setupLogging() *log.Logger {
 	logger := log.New(os.Stdout, "[TELEGRAM-BOT] ", log.LstdFlags|log.Lshortfile)
 	
 	// Set log output format based on environment
-	if os.Getenv("LOG_LEVEL") == "DEBUG" {
+	logLevel := os.Getenv("LOG_LEVEL")
+	if logLevel == "DEBUG" {
 		logger.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
+	} else {
+		// For non-debug levels, use cleaner format without file info
+		logger.SetFlags(log.LstdFlags)
 	}
 	
 	return logger

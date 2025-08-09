@@ -74,11 +74,11 @@ func (h *PingHandler) Handle(ctx context.Context, cmdCtx *CommandContext) error 
 
 // createPongMessage creates a pong response with timestamp and latency information
 func (h *PingHandler) createPongMessage(responseTime time.Time, commandLatency time.Duration) string {
-	return fmt.Sprintf("🏓 **Pong!**\n\n"+
-		"📅 **Timestamp:** %s\n"+
-		"⚡ **Command Latency:** %v\n"+
-		"✅ **Status:** Bot is responsive and operational",
-		responseTime.Format("2006-01-02 15:04:05 MST"),
+	return fmt.Sprintf("🏓 Pong!\n\n"+
+		"Time: %s\n"+
+		"Latency: %v\n"+
+		"Status: Online",
+		responseTime.Format("15:04:05"),
 		commandLatency.Round(time.Millisecond))
 }
 
@@ -103,8 +103,8 @@ func (h *PingHandler) sendMessage(ctx context.Context, chatID int64, message str
 	
 	// Create the message request
 	request := &tg.MessagesSendMessageRequest{
-		Peer:    peer,
-		Message: message,
+		Peer:     peer,
+		Message:  message,
 		RandomID: time.Now().UnixNano(), // Add random ID to prevent duplicate messages
 	}
 	

@@ -72,7 +72,12 @@ func (b *TelegramBot) Start() error {
 	}()
 	
 	// Create zap logger for gotgproto (it requires zap logger)
-	zapLogger, err := zap.NewDevelopment()
+	// Use production config and disable all output to reduce verbosity
+	zapConfig := zap.NewProductionConfig()
+	zapConfig.Level = zap.NewAtomicLevelAt(zap.FatalLevel) // Only show fatal errors
+	zapConfig.OutputPaths = []string{"/dev/null"} // Disable output completely
+	zapConfig.ErrorOutputPaths = []string{"/dev/null"} // Disable error output too
+	zapLogger, err := zapConfig.Build()
 	if err != nil {
 		if b.errorHandler != nil && b.errorHandler.IsNetworkError(err) {
 			return b.errorHandler.HandleNetworkError(err, true)
@@ -115,12 +120,14 @@ func (b *TelegramBot) Start() error {
 			}
 		}()
 		
-		b.logger.Printf("Starting gotgproto client...")
 		b.client.Idle()
 	}()
 	
-	// Wait a moment to ensure client is ready
-	time.Sleep(100 * time.Millisecond)
+	// Wait a moment to ensure client is ready and get bot info
+	time.Sleep(500 * time.Millisecond)
+	
+	// Get bot information to show logged in message
+	b.showBotInfo()
 	
 	b.logger.Printf("Telegram bot started successfully")
 	return nil
@@ -204,6 +211,29 @@ func (b *TelegramBot) handleMessage(ctx *ext.Context, update *ext.Update) error 
 	b.routeCommandDirect(ctx.Context, msg)
 	
 	return nil
+}
+
+// showBotInfo retrieves and displays bot information
+func (b *TelegramBot) showBotInfo() {
+	if b.client == nil {
+		return
+	}
+	
+	// Get bot's own user info using the gotgproto API
+	self := b.client.Self
+	if self == nil {
+		b.logger.Printf("Could not retrieve bot info")
+		return
+	}
+	
+	username := "unknown"
+	if self.Username != "" {
+		username = self.Username
+	} else if self.FirstName != "" {
+		username = self.FirstName
+	}
+	
+	b.logger.Printf("Logged in as @%s", username)
 }
 
 // routeCommandDirect routes commands directly without converting to tg types
